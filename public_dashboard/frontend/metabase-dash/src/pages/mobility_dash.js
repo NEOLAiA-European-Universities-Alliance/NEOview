@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { base_url } from '../api';
 
 const Dashboard = () => {
   const [iframeUrl, setIframeUrl] = useState("");
 
   useEffect(() => {
-    axios.get("http://127.0.0.1:5000/metabase-dashboard")
+    axios.get(`${base_url}metabase-dashboard`)
       .then(response => setIframeUrl(response.data.iframeUrl))
       .catch(error => console.error("Error fetching Metabase URL", error));
   }, []);
