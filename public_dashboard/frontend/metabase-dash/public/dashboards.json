@@ -1,0 +1,18 @@
+[
+  {
+    "id": "mobility-window",
+    "label": "Mobility Windows",
+    "description": "Explore mobility patterns and window-level analytics.",
+    "icon": "🚗",
+    "path": "mobility-window",
+    "endpoint": "mobility-window"
+  },
+  {
+    "id": "research-profiles",
+    "label": "Research Profiles",
+    "description": "Browse researcher profiles and publication insights.",
+    "icon": "🔬",
+    "path": "research-profiles",
+    "endpoint": "research-profiles"
+  }
+]

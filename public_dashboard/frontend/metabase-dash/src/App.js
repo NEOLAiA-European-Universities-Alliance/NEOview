@@ -1,5 +1,5 @@
 import './App.css';
-import EmbedDash from './pages/EmbedDash';
+import DashLoader from './pages/DashLoader';
 import Home from './pages/home';
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
@@ -9,8 +9,7 @@ function App() {
     <Router basename='/neoview'>
       <Routes>
         <Route path='/' element={<Home />} />
-        <Route path='/mobility-windows' element={<EmbedDash endpoint="metabase-dashboard" title="Mobility Windows" />} />
-        <Route path='/research-profile' element={<EmbedDash endpoint="research-profiles" title="Research Profiles" />} />
+        <Route path='/:dashId' element={<DashLoader />} />
       </Routes>
     </Router>
   );

@@ -1,26 +1,9 @@
 import React, { useState } from "react";
-
-const dashboards = [
-  {
-    id: "mobility-windows",
-    label: "Mobility Windows",
-    description: "Explore mobility patterns and window-level analytics.",
-    icon: "🚗",
-    path: "mobility-windows",
-    endpoint: "metabase-dashboard",
-  },
-  {
-    id: "research-profile",
-    label: "Research Profiles",
-    description: "Browse researcher profiles and publication insights.",
-    icon: "🔬",
-    path: "research-profile",
-    endpoint: "research-profiles",
-  },
-];
+import useDashboards from "../hooks/useDashboards";
 
 const Home = () => {
   const [hoveredCard, setHoveredCard] = useState(null);
+  const { dashboards, loading, error } = useDashboards();
 
   return (
     <div style={styles.pageWrapper}>
@@ -56,6 +39,8 @@ const Home = () => {
 
       {/* Dashboard cards */}
       <main style={styles.mainContent}>
+        {loading && <p style={{ textAlign: "center", color: "#6b7c8a" }}>Loading dashboards...</p>}
+        {error   && <p style={{ textAlign: "center", color: "#e74c3c" }}>{error}</p>}
         <div style={styles.grid}>
           {dashboards.map((dash) => (
             <div
