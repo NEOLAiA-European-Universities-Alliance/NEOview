@@ -7,17 +7,22 @@ Public dashboard viewer built with a Node.js/Express backend and a React fronten
 ## Project structure
 
 ```
-metabase/                         # Docker Compose for Metabase
+metabase/                              # Docker Compose for Metabase
 public_dashboard/
-  backend/                        # Express API — generates signed embed URLs
-    server.js
-  frontend/metabase-dash/         # React app
+  backend/
+    server.js                          # Express API — generates signed embed URLs
+  frontend/metabase-dash/
+    public/
+      dashboards.json                  # ← edit this to add/remove dashboards
     src/
+      hooks/
+        useDashboards.js               # Fetches dashboards.json at runtime
       pages/
-        home.js                   # Landing page (dashboard list)
-        EmbedDash.js              # Generic iframe dashboard component
-      App.js                      # Router
-      api.js                      # Base URL for the backend
+        home.js                        # Landing page — reads dashboards.json
+        EmbedDash.js                   # Generic iframe component
+        DashLoader.js                  # Resolves :dashId from URL → EmbedDash
+      App.js                           # Router (no changes needed for new dashboards)
+      api.js                           # Backend base URL
 ```
 
 ---
@@ -26,16 +31,16 @@ public_dashboard/
 
 ### 1 — Enable embedding in Metabase
 
-Open your Metabase instance, go to the target dashboard and make sure **Embedding** is enabled for it. Note the **dashboard numeric ID** shown in the URL (e.g. `5`).
+Open your Metabase instance, navigate to the target dashboard and make sure **Embedding** is enabled. Note the **numeric dashboard ID** shown in the URL (e.g. `5`).
 
 ### 2 — Add a backend endpoint (`server.js`)
 
-Open `public_dashboard/backend/server.js` and add a new route following the same pattern as the existing ones:
+Open `public_dashboard/backend/server.js` and add a new route:
 
 ```js
 app.get("/nodedash/my-new-dashboard", (req, res) => {
   const payload = {
-    resource: { dashboard: 5 },   // ← replace with the actual Metabase dashboard ID
+    resource: { dashboard: 5 },   // ← Metabase dashboard ID
     params: {},
     exp: Math.round(Date.now() / 1000) + 10 * 60,
   };
@@ -45,33 +50,33 @@ app.get("/nodedash/my-new-dashboard", (req, res) => {
 });
 ```
 
-### 3 — Add a card on the landing page (`home.js`)
+### 3 — Add an entry to `dashboards.json`
 
-Open `public_dashboard/frontend/metabase-dash/src/pages/home.js` and add an entry to the `dashboards` array:
+Open `public/dashboards.json` and append a new object to the array:
 
-```js
+```json
 {
-  id: "my-new-dashboard",
-  label: "My New Dashboard",
-  description: "Short description shown on the card.",
-  icon: "📊",                         // any emoji
-  path: "my-new-dashboard",           // URL segment: /neoview/my-new-dashboard
-  endpoint: "my-new-dashboard",       // must match the route defined in step 2 (without /nodedash/)
-},
+  "id": "my-new-dashboard",
+  "label": "My New Dashboard",
+  "description": "Short description shown on the landing card.",
+  "icon": "📊",
+  "path": "my-new-dashboard",
+  "endpoint": "my-new-dashboard"
+}
 ```
 
-### 4 — Add a route in `App.js`
+| Field | Description |
+|---|---|
+| `id` | Unique identifier (used as React key) |
+| `label` | Title shown on the card and in the iframe |
+| `description` | Subtitle shown on the card |
+| `icon` | Emoji shown on the card |
+| `path` | URL segment: `/neoview/<path>` |
+| `endpoint` | Backend route name (without `/nodedash/`) — must match step 2 |
 
-Open `public_dashboard/frontend/metabase-dash/src/App.js` and add a `<Route>` inside `<Routes>`:
+That's it. No changes to `App.js` or any other React source file are required.
 
-```jsx
-<Route
-  path='/my-new-dashboard'
-  element={<EmbedDash endpoint="my-new-dashboard" title="My New Dashboard" />}
-/>
-```
-
-### 5 — Restart the services
+### 4 — Restart the services
 
 ```bash
 # backend
@@ -81,7 +86,7 @@ cd public_dashboard/backend && npm start
 cd public_dashboard/frontend/metabase-dash && npm start
 ```
 
-The new dashboard will appear as a card on the landing page at `/neoview/` and will open in a new tab at `/neoview/my-new-dashboard`.
+The new dashboard will appear as a card on `/neoview/` and will open in a new tab at `/neoview/my-new-dashboard`.
 
 ---
 
