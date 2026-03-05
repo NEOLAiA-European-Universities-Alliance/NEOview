@@ -1,21 +1,4 @@
-# =============================================================================
-# Full-stack docker-compose for the NEOLAiA public dashboard
-#
-# IMPORTANT – Metabase data preservation:
-#   The `name: metabase` directive forces Docker Compose to use the project
-#   name "metabase", which is identical to the one used by the original
-#   metabase/docker-compose.yml (Docker derives the project name from the
-#   directory name by default).  This means the named volume
-#   "metabase_postgres_data" already created by the previous compose file is
-#   reused automatically — no data is lost when switching to this file.
-#
-#   If the old stack is still running, stop it first:
-#       cd metabase && docker compose down
-#   Then start everything from the repo root:
-#       docker compose up -d
-# =============================================================================
-
-name: metabase   # keeps the same project name → same postgres_data volume
+name: metabase 
 
 services:
 
