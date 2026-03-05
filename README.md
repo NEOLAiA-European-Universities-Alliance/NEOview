@@ -230,22 +230,20 @@ public_dashboard/
 
 Open your Metabase instance, navigate to the target dashboard and make sure **Embedding** is enabled. Note the **numeric dashboard ID** shown in the URL (e.g. `5`).
 
-### 2 — Add a backend endpoint (`server.js`)
+### 2 — Register the dashboard in `server.js`
 
-Open `public_dashboard/backend/server.js` and add a new route:
+Open `public_dashboard/backend/server.js` and add an entry to the `dashboards` map:
 
 ```js
-app.get("/nodedash/my-new-dashboard", (req, res) => {
-  const payload = {
-    resource: { dashboard: 5 },   // ← Metabase dashboard ID
-    params: {},
-    exp: Math.round(Date.now() / 1000) + 10 * 60,
-  };
-  const token = jwt.sign(payload, METABASE_SECRET_KEY);
-  const iframeUrl = `${METABASE_SITE_URL}/embed/dashboard/${token}#bordered=true&titled=true`;
-  res.json({ iframeUrl });
-});
+const dashboards = {
+  "degree-programs":  3,
+  "research-profiles": 4,
+  "infrastructures":  5,
+  "my-new-dashboard": 6,   // ← route name : Metabase dashboard ID
+};
 ```
+
+The single `/nodedash/:name` route handles all dashboards automatically — no new route function needed.
 
 ### 3 — Add an entry to `dashboards.json`
 
