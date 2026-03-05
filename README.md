@@ -12,49 +12,141 @@
 ## Index
 
 - [Prerequisites](#prerequisites)
-- [Quickstart (local development)](#quickstart-local-development)
-- [Optional: run Metabase locally (Docker)](#optional-run-metabase-locally-docker)
+- [Docker deployment (recommended)](#docker-deployment-recommended)
+  - [Preserving existing Metabase data](#preserving-existing-metabase-data)
+  - [If nginx is already installed on the host](#if-nginx-is-already-installed-on-the-host)
+- [Local development (without Docker)](#local-development-without-docker)
 - [Configuration](#configuration)
 - [Project structure](#project-structure)
 - [How to add a new dashboard](#how-to-add-a-new-dashboard)
-- [Environment variables (backend)](#environment-variables-backend)
-- [Build (frontend)](#build-frontend)
+- [Environment variables reference](#environment-variables-reference)
 - [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Prerequisites
 
-- Node.js (18+ suggested)
-- npm
-- Optional: Docker + Docker Compose (only if you want to run Metabase locally)
+**Docker deployment:** Docker Engine + Docker Compose v2
 
-## Quickstart (local development)
+**Local development:** Node.js 18+, npm
 
-### 1) Backend
+---
+
+## Docker deployment (recommended)
+
+The root `docker-compose.yml` spins up four services:
+
+| Service | Description | Default port |
+|---|---|---|
+| `postgres` | PostgreSQL — Metabase metadata store | internal |
+| `metabase` | Metabase instance | `3000` |
+| `dashboard-backend` | Node/Express — JWT embed-URL generator | internal |
+| `dashboard-frontend` | React app served by nginx (reverse-proxies `/nodedash/` to the backend) | `8080` |
+
+### 1 — Create the environment file
+
+```bash
+cp .env.example .env
+# edit .env with your actual values
+```
+
+See [Environment variables reference](#environment-variables-reference) for details.
+
+### 2 — Start everything
+
+```bash
+docker compose up -d --build
+```
+
+The dashboard will be available at `http://your-host:8080/neoview`.  
+Metabase will be available at `http://your-host:3000`.
+
+### Preserving existing Metabase data
+
+The compose file sets `name: metabase` at the top level. Docker Compose derives the project name from this field, which makes it use the volume name `metabase_postgres_data` — the exact same name that was created by the previous `metabase/docker-compose.yml` (where the project name was inferred from the directory name `metabase`).
+
+**No data is lost.** The Postgres volume is reused transparently.
+
+Before switching to the new compose file, stop the old stack:
+
+```bash
+cd metabase && docker compose down
+cd ..
+```
+
+Then start with the new one from the repo root:
+
+```bash
+docker compose up -d --build
+```
+
+### If nginx is already installed on the host
+
+The `dashboard-frontend` container runs its own nginx on port `8080` (not `80`), so there is **no port conflict** with a host nginx by default.
+
+If you want to route traffic through the host nginx on port `80`/`443`, add a server block that proxies to the containers:
+
+```nginx
+# /etc/nginx/sites-available/neoview
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    # React dashboard (routed to the container nginx)
+    location /neoview {
+        proxy_pass         http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+    }
+
+    # Metabase
+    location /metabase {
+        proxy_pass         http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+Then enable the site and reload:
+
+```bash
+sudo ln -s /etc/nginx/sites-available/neoview /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+---
+
+## Local development (without Docker)
+
+### 1 — Backend
 
 ```bash
 cd public_dashboard/backend
 npm install
 ```
 
-Create `public_dashboard/backend/.env` (see also “Environment variables” below):
+Create `public_dashboard/backend/.env`:
 
-```bash
+```env
 METABASE_SITE_URL=http://localhost:3000
 METABASE_SECRET_KEY=your_metabase_secret_key
 PORT=5000
 ```
 
-Run:
-
 ```bash
 npm start
 ```
 
-The backend exposes endpoints like `http://localhost:5000/nodedash/<dashboard-endpoint>`.
+The backend exposes endpoints at `http://localhost:5000/nodedash/<endpoint>`.
 
-### 2) Frontend
+### 2 — Frontend
 
 ```bash
 cd public_dashboard/frontend/metabase-dash
@@ -62,50 +154,61 @@ npm install
 npm start
 ```
 
-Open: `http://localhost:3000/neoview/`
+Open `http://localhost:3000/neoview` (or the port React picks if `3000` is taken).
 
-## Optional: run Metabase locally (Docker)
+> **Note:** in local dev `src/api.js` uses the relative URL `/nodedash/` which works when
+> the backend is reachable on the same host. If you need to override it, temporarily set
+> `base_url` to `http://localhost:5000/nodedash/` in `src/api.js`.
 
-This repo includes a Docker Compose file at `metabase/docker-compose.yml` (Metabase + Postgres).
+### 3 — Optional: run Metabase locally
 
 ```bash
 cd metabase
 docker compose up -d
 ```
 
-Notes:
-- Metabase is mapped to port `3000` in the compose file, which may conflict with the React dev server (also `3000`).
-  - Easiest option: let React start on a different port when prompted (e.g. `3001`).
-  - If you change ports, also update the backend CORS origin list accordingly.
+Metabase starts on port `3000`. If it conflicts with the React dev server, let React use a different port when prompted.
+
+---
 
 ## Configuration
 
 ### Dashboard list
 
-The visible dashboards are defined in:
-- `public_dashboard/frontend/metabase-dash/public/dashboards.json`
+Add or remove dashboards by editing:
 
-The “How to add a new dashboard” section below mentions `public/dashboards.json` — in this repo the file lives at the path above.
+```
+public_dashboard/frontend/metabase-dash/public/dashboards.json
+```
 
 ### Frontend routing base
 
 The React app is served under `/neoview`:
-- `public_dashboard/frontend/metabase-dash/src/App.js` uses `basename='/neoview'`
-- `public_dashboard/frontend/metabase-dash/package.json` sets `"homepage": "/neoview"`
+- `public_dashboard/frontend/metabase-dash/src/App.js` — `basename='/neoview'`
+- `public_dashboard/frontend/metabase-dash/package.json` — `"homepage": "/neoview"`
 
-### Backend base URL (frontend)
+### Backend base URL
 
-The frontend calls the backend using:
-- `public_dashboard/frontend/metabase-dash/src/api.js`
+`public_dashboard/frontend/metabase-dash/src/api.js` exports `base_url`.  
+In production (Docker) this is `/nodedash/` (relative, routed by the container nginx).  
+Change it only if you have a custom setup.
+
+---
 
 ## Project structure
 
 ```
-metabase/                              # Docker Compose for Metabase
+docker-compose.yml                     # ← root compose (all services)
+.env.example                           # ← copy to .env and fill in values
+metabase/
+  docker-compose.yml                   # legacy standalone Metabase compose
 public_dashboard/
   backend/
+    Dockerfile
     server.js                          # Express API — generates signed embed URLs
   frontend/metabase-dash/
+    Dockerfile
+    nginx.conf                         # nginx config for the frontend container
     public/
       dashboards.json                  # ← edit this to add/remove dashboards
     src/
@@ -146,7 +249,7 @@ app.get("/nodedash/my-new-dashboard", (req, res) => {
 
 ### 3 — Add an entry to `dashboards.json`
 
-Open `public/dashboards.json` and append a new object to the array:
+Open `public_dashboard/frontend/metabase-dash/public/dashboards.json` and append:
 
 ```json
 {
@@ -168,9 +271,15 @@ Open `public/dashboards.json` and append a new object to the array:
 | `path` | URL segment: `/neoview/<path>` |
 | `endpoint` | Backend route name (without `/nodedash/`) — must match step 2 |
 
-That's it. No changes to `App.js` or any other React source file are required.
+### 4 — Apply the changes
 
-### 4 — Restart the services
+**Docker (production):**
+
+```bash
+docker compose up -d --build dashboard-backend dashboard-frontend
+```
+
+**Local dev:**
 
 ```bash
 # backend
@@ -180,31 +289,39 @@ cd public_dashboard/backend && npm start
 cd public_dashboard/frontend/metabase-dash && npm start
 ```
 
-The new dashboard will appear as a card on `/neoview/` and will open in a new tab at `/neoview/my-new-dashboard`.
+The new dashboard will appear as a card on `/neoview/` and will open at `/neoview/my-new-dashboard`.
 
 ---
 
-## Environment variables (backend)
+## Environment variables reference
 
-Create a `.env` file in `public_dashboard/backend/`:
+All variables are read from a `.env` file in the **repo root** (used by `docker-compose.yml`).  
+Copy `.env.example` to `.env` and fill in the values.
 
-```
-METABASE_SITE_URL=https://your-metabase-instance.example.com
+| Variable | Used by | Description |
+|---|---|---|
+| `POSTGRES_USER` | postgres, metabase | Postgres username |
+| `POSTGRES_DB` | postgres, metabase | Postgres database name |
+| `POSTGRES_PASSWORD` | postgres, metabase | Postgres password |
+| `MB_SITE_URL` | metabase | Public URL of Metabase (shown in admin settings) |
+| `METABASE_SITE_URL` | dashboard-backend | Metabase URL used to build iframe embed URLs |
+| `METABASE_SECRET_KEY` | dashboard-backend | Metabase embedding secret key (Settings → Embedding) |
+| `FRONTEND_PORT` | dashboard-frontend | Host port for the React nginx container (default `8080`) |
+| `CORS_ORIGINS` | dashboard-backend | Optional comma-separated extra CORS origins |
+
+For **local development only**, create `public_dashboard/backend/.env` with at minimum:
+
+```env
+METABASE_SITE_URL=http://localhost:3000
 METABASE_SECRET_KEY=your_metabase_secret_key
 PORT=5000
 ```
 
-## Build (frontend)
-
-```bash
-cd public_dashboard/frontend/metabase-dash
-npm run build
-```
-
-The build output will be in `public_dashboard/frontend/metabase-dash/build`.
+---
 
 ## Troubleshooting
 
-- **Blank iframe / 401 / embedding errors**: ensure embedding is enabled in Metabase and `METABASE_SECRET_KEY` matches your Metabase embedding secret.
-- **CORS errors**: update the `origin` allowlist in `public_dashboard/backend/server.js` if you serve the frontend from a different host/port.
-- **Wrong base path**: if you do not serve the frontend under `/neoview`, update both `basename` in `App.js` and `homepage` in `package.json`.
+- **Blank iframe / 401 / embedding errors** — ensure embedding is enabled in Metabase and `METABASE_SECRET_KEY` matches your Metabase embedding secret.
+- **CORS errors** — add the offending origin to `CORS_ORIGINS` in `.env` and restart the backend container.
+- **Wrong base path** — if you do not serve the frontend under `/neoview`, update both `basename` in `App.js` and `homepage` in `package.json`, then rebuild the frontend image.
+- **Port conflict on host** — change `FRONTEND_PORT` in `.env` (e.g. `FRONTEND_PORT=9090`) or set up a host nginx reverse proxy as described [above](#if-nginx-is-already-installed-on-the-host).
