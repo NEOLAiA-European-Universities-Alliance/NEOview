@@ -1,27 +1,6 @@
-# =============================================================================
-# Full-stack docker-compose for the NEOLAiA public dashboard
-#
-# IMPORTANT – Metabase data preservation:
-#   The `name: metabase` directive forces Docker Compose to use the project
-#   name "metabase", which is identical to the one used by the original
-#   metabase/docker-compose.yml (Docker derives the project name from the
-#   directory name by default).  This means the named volume
-#   "metabase_postgres_data" already created by the previous compose file is
-#   reused automatically — no data is lost when switching to this file.
-#
-#   If the old stack is still running, stop it first:
-#       cd metabase && docker compose down
-#   Then start everything from the repo root:
-#       docker compose up -d
-# =============================================================================
-
-name: metabase   # keeps the same project name → same postgres_data volume
+name: metabase 
 
 services:
-
-  # ---------------------------------------------------------------------------
-  # PostgreSQL – Metabase metadata store
-  # ---------------------------------------------------------------------------
   postgres:
     image: postgres:latest
     container_name: postgres
@@ -41,9 +20,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # ---------------------------------------------------------------------------
-  # Metabase
-  # ---------------------------------------------------------------------------
   metabase:
     image: metabase/metabase:latest
     container_name: metabase
@@ -72,12 +48,9 @@ services:
       timeout: 5s
       retries: 5
 
-  # ---------------------------------------------------------------------------
-  # Dashboard backend (Node / Express – JWT token generator)
-  # ---------------------------------------------------------------------------
   dashboard-backend:
     build:
-      context: ./public_dashboard/backend
+      context: ./dashboards/backend
       dockerfile: Dockerfile
     container_name: dashboard-backend
     restart: unless-stopped
@@ -85,7 +58,6 @@ services:
       PORT: 5000
       METABASE_SITE_URL: ${METABASE_SITE_URL}
       METABASE_SECRET_KEY: ${METABASE_SECRET_KEY}
-      # Optional: comma-separated list of extra allowed CORS origins
       CORS_ORIGINS: ${CORS_ORIGINS:-}
     networks:
       - metanet1
@@ -94,12 +66,9 @@ services:
       metabase:
         condition: service_healthy
 
-  # ---------------------------------------------------------------------------
-  # Dashboard frontend (React → built with nginx reverse-proxy)
-  # ---------------------------------------------------------------------------
   dashboard-frontend:
     build:
-      context: ./public_dashboard/frontend/metabase-dash
+      context: ./dashboards/frontend/metabase-dash
       dockerfile: Dockerfile
     container_name: dashboard-frontend
     restart: unless-stopped
@@ -110,21 +79,11 @@ services:
     depends_on:
       - dashboard-backend
 
-# =============================================================================
-# Networks
-# =============================================================================
 networks:
   metanet1:
     driver: bridge
   dashboard_net:
     driver: bridge
 
-# =============================================================================
-# Volumes
-#
-# Because `name: metabase` is set above, this volume is resolved by Docker as
-# "metabase_postgres_data" — the same name used by the original
-# metabase/docker-compose.yml.  Existing data is therefore preserved.
-# =============================================================================
 volumes:
   postgres_data:
